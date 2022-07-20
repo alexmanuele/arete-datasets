@@ -12,78 +12,90 @@ from executor import execute, ExternalCommand, ExternalCommandFailed
 /// Motivated by limited internet access in HPC compute nodes.
 //  Datasets required:
     [X] - Kraken2. Available as .tar with curl
-    [ ] - BACMET. Unkown
-    [ ] - VF_DB. Unkown
+    [X] - BACMET.
+    [X] - VF_DB.
     [X] - CAZy DB. Available as .fna with curl
     [X] - RGI. Available as .tar with curl
-    [X] - NCBI AMR HMM. Available as .lib via curl
+
 //
 //  More may be added with development.
 /////////////////////////////////////////////////////////////////////////////"""
 
 PROGRAM = "arete-datasets"
-VERSION = "0.0.1"
+VERSION = "0.0.2"
 STDOUT = 11
 STDERR = 12
-CACHE_DIR = f'{os.path.expanduser("~")}/.arete'
-CACHE_JSON = f'{CACHE_DIR}/datasets.json'
-EXPIRATION = 15 # Refresh db info if cache is older than 15 days
+
 logging.addLevelName(STDOUT, "STDOUT")
 logging.addLevelName(STDERR, "STDERR")
 
 def check_cache():
     pass
 
-def download_kraken_db():
+def download_kraken_db(cache_dir):
     print("*"*80)
     s = "*** Download Kraken2 DB"
     print(s, " "*(75- len(s)), "***")
     print("*"*80)
-    execute(f'curl https://genome-idx.s3.amazonaws.com/kraken/k2_standard_8gb_20201202.tar.gz --output {CACHE_DIR}/kraken2/k2_standard_8gb_20201202.tar.gz')
-    execute(f'mkdir -p {CACHE_DIR}/kraken2/k2_standard_8gb_20201202')
-    execute(f'tar xvf {CACHE_DIR}/kraken2/k2_standard_8gb_20201202.tar.gz -C {CACHE_DIR}/kraken2/k2_standard_8gb_20201202')
+    execute(f'curl https://genome-idx.s3.amazonaws.com/kraken/k2_standard_8gb_20201202.tar.gz --output {cache_dir}/k2_standard_8gb_20201202.tar.gz')
+    execute(f'mkdir -p {cache_dir}/k2_standard_8gb_20201202')
+    execute(f'tar xvf {cache_dir}/k2_standard_8gb_20201202.tar.gz -C {cache_dir}/k2_standard_8gb_20201202')
     print()
 
-def download_cazy_db():
+def download_cazy_db(cache_dir):
     print("*"*80)
     s = "*** Download CAZy DB"
     print(s, " "*(75- len(s)), "***")
     print("*"*80)
-    execute(f'curl https://bcb.unl.edu/dbCAN2/download/CAZyDB.07312020.fa --output {CACHE_DIR}/CAZy/CAZyDB.07312020.fa')
+    cmd = "curl https://bcb.unl.edu/dbCAN2/download/CAZyDB.07312020.fa --output {0}/CAZyDB.07312020.fa".format(cache_dir)
+    execute(cmd)
     print()
-def download_rgi():
+
+def download_vfdb(cache_dir):
+    print("*"*80)
+    s = "*** Download VFDB"
+    print(s, " "*(75- len(s)), "***")
+    print("*"*80)
+    execute(f'curl http://www.mgc.ac.cn/VFs/Down/VFDB_setB_pro.fas.gz --output {cache_dir}/VFDB_setB_pro.fas.gz')
+    print()
+
+def download_bacmet(cache_dir):
+    print("*"*80)
+    s = "*** Download BacMET"
+    print(s, " "*(75- len(s)), "***")
+    print("*"*80)
+    execute(f'curl http://bacmet.biomedicine.gu.se/download/BacMet2_predicted_database.fasta.gz --output {cache_dir}/BacMet2_predicted_database.fasta.gz')
+    print()
+
+def download_rgi(cache_dir):
     print("*"*80)
     s = "*** Download RGI/CARD"
     print(s, " "*(75- len(s)), "***")
     print("*"*80)
-    execute(f'curl https://card.mcmaster.ca/latest/data --output {CACHE_DIR}/card/card.tar.bz2')
-    execute(f'tar xvf {CACHE_DIR}/card/card.tar.bz2 -C {CACHE_DIR}/card')
-    fh = open('{0}/card/card.json'.format(CACHE_DIR))
+    curl_cmd = 'curl https://card.mcmaster.ca/latest/data --output {0}/card.tar.bz2'.format(cache_dir)
+    tar_cmd = 'tar xvf {0}/card.tar.bz2 --directory {0}'.format(cache_dir)
+    execute(curl_cmd)
+    execute(tar_cmd)
+    fh = open('{0}/card.json'.format(cache_dir))
     card=json.load(fh)
-    with open('{0}/card/card.version.txt'.format(CACHE_DIR), 'w') as outfh:
+    with open('{0}/card.version.txt'.format(cache_dir), 'w') as outfh:
         outfh.write(card['_version'])
     print()
 
-def download_ncbi_amr_hmm():
-    print("*"*80)
-    s = "*** Download NCBI AMR HMM"
-    print(s, " "*(75- len(s)), "***")
-    print("*"*80)
-    execute(f'wget https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinder/data/latest/AMR.LIB -O {CACHE_DIR}/pathracer/AMR.LIB')
-    print()
-
 if __name__ == '__main__':
-    #### TODO check cache and conditional db download
-    # cache...
+    pipeline_path = sys.argv[1]
 
-    #Make directories
-    execute(f'mkdir -p {CACHE_DIR}/card')
-    execute(f'mkdir -p {CACHE_DIR}/kraken2')
-    execute(f'mkdir -p {CACHE_DIR}/CAZy')
-    execute(f'mkdir -p {CACHE_DIR}/pathracer')
+    execute(f'mkdir -p {pipeline_path}/dbcache')
+    execute(f'mkdir -p {pipeline_path}/container_cache')
+
+    cache_dir = "{0}/dbcache".format(pipeline_path)
+    print("+++")
+    print(cache_dir)
+    print("+++")
 
     #Download data
-    download_rgi()
-    download_kraken_db()
-    download_cazy_db()
-    download_ncbi_amr_hmm()
+    download_rgi(cache_dir)
+    download_kraken_db(cache_dir)
+    download_cazy_db(cache_dir)
+    download_bacmet(cache_dir)
+    download_vfdb(cache_dir)
